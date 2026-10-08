@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Malmilk - สั่งโยเกิร์ต</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Arial,"Noto Sans Thai",sans-serif;
+  background:#fff8ef;
+  color:#3b2a20;
+}
+
+header{
+  background:linear-gradient(135deg,#fff,#ffe8bd);
+  padding:24px 18px;
+  text-align:center;
+  border-bottom:1px solid #f0d8b0;
+}
+
+.logo{
+  font-size:30px;
+  font-weight:800;
+  color:#7b4b22
+}
+
+.sub{
+  margin-top:5px;
+  color:#8b6b52
+}
+
+.container{
+  max-width:700px;
+  margin:auto;
+  padding:18px
+}
+
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:16px;
+  box-shadow:0 5px 18px #0000000d;
+  border:1px solid #f2dfc8;
+}
+
+h2{
+  font-size:19px;
+  margin:0 0 14px
+}
+
+.products{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px
+}
+
+.product{
+  border:1px solid #ead9c5;
+  border-radius:15px;
+  padding:14px;
+  background:#fff
+}
+
+.product-name{
+  font-weight:700;
+  font-size:17px
+}
+
+.product-desc{
+  font-size:12px;
+  color:#947861;
+  margin:5px 0 10px
+}
+
+.price{
+  font-weight:700;
+  color:#8b5e34
+}
+
+.qty{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px
+}
+
+.qty button{
+  width:32px;
+  height:32px;
+  border:0;
+  border-radius:50%;
+  background:#f0dfca;
+  font-size:19px;
+  cursor:pointer
+}
+
+/* ปุ่ม + / - ตอนยังโหลดสต็อก */
+.qty button:disabled{
+  background:#e6e6e6;
+  color:#a0a0a0;
+  cursor:not-allowed;
+  opacity:0.7;
+}
+
+.qty span{
+  min-width:24px;
+  text-align:center;
+  font-weight:bold
+}
+
+.payments{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px
+}
+
+.pay-btn{
+  border:1.5px solid #e0c7aa;
+  background:#fff7ed;
+  border-radius:12px;
+  padding:12px 5px;
+  font-size:15px;
+  cursor:pointer
+}
+
+.pay-btn.active{
+  background:#8b5e34;
+  color:#fff;
+  border-color:#8b5e34
+}
+
+.summary-row{
+  display:flex;
+  justify-content:space-between;
+  margin:9px 0
+}
+
+.total{
+  font-size:21px;
+  font-weight:800;
+  color:#7b4b22;
+  border-top:1px solid #ead9c5;
+  padding-top:12px
+}
+
+.order-btn{
+  width:100%;
+  border:0;
+  border-radius:15px;
+  padding:16px;
+  background:#7b4b22;
+  color:white;
+  font-size:18px;
+  font-weight:800;
+  cursor:pointer
+}
+
+.note{
+  font-size:12px;
+  color:#8c7460;
+  margin-top:8px
+}
+
+#success{
+  display:none;
+  text-align:center
+}
+
+.check{
+  font-size:45px
+}
+
+@media(max-width:500px){
+  .products{
+    grid-template-columns:1fr
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">🥛 Malmilk</div>
+  <div class="sub">โยเกิร์ตสด อร่อยง่าย สั่งได้ที่โต๊ะ</div>
+</header>
+
+<div class="container" id="orderPage">
+
+  <!-- โต๊ะ -->
+  <div class="card">
+    <h2>1. ระบุหมายเลขโต๊ะ</h2>
+
+    <input
+      id="tableInput"
+      type="text"
+      inputmode="numeric"
+      placeholder="เช่น 5"
+      style="
+        width:100%;
+        padding:14px;
+        border:1.5px solid #e0c7aa;
+        border-radius:12px;
+        font-size:17px;
+        outline:none;
+      "
+      oninput="setTable(this.value)"
+    >
+  </div>
+
+  <!-- สินค้า -->
+  <div class="card">
+
+    <h2>2. เลือกรสชาติ</h2>
+
+    <div class="note">
+      แสดงจำนวนคงเหลือของแต่ละรสชาติ
+    </div>
+
+    <div class="products" id="products"></div>
+
+  </div>
+
+  <!-- ชำระเงิน -->
+  <div class="card">
+
+    <h2>3. วิธีชำระเงิน</h2>
+
+    <div class="payments">
+
+      <button
+        class="pay-btn active"
+        data-pay="เงินสด"
+        onclick="selectPay(this)"
+      >
+        💵 เงินสด
+      </button>
+
+      <button
+        class="pay-btn"
+        data-pay="เงินโอน"
+        onclick="selectPay(this)"
+      >
+        📱 เงินโอน
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- สรุป -->
+  <div class="card">
+
+    <h2>สรุปคำสั่งซื้อ</h2>
+
+    <div class="summary-row">
+      <span>โต๊ะ</span>
+      <strong id="sumTable">ยังไม่ได้ระบุ</strong>
+    </div>
+
+    <div class="summary-row">
+      <span>รายการ</span>
+      <strong id="sumItems">0 ชิ้น</strong>
+    </div>
+
+    <div class="summary-row total">
+      <span>ยอดรวม</span>
+      <span id="total">฿0</span>
+    </div>
+
+  </div>
+
+  <button
+    id="orderBtn"
+    class="order-btn"
+    onclick="placeOrder()"
+    disabled
+    style="background-color:#ccc; cursor:not-allowed;"
+  >
+    กำลังนับสต็อค กรุณารอสักครู่...
+  </button>
+
+</div>
+
+
+<!-- หน้าสำเร็จ -->
+<div class="container" id="success">
+
+  <div class="card">
+
+    <div class="check">✅</div>
+
+    <h2>รับออเดอร์แล้ว!</h2>
+
+    <p id="successText"></p>
+
+    <button
+      class="order-btn"
+      onclick="location.reload()"
+    >
+      สั่งรายการใหม่
+    </button>
+
+  </div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   ตั้งค่า Google Apps Script Web App
+   ===================================================== */
+
+const API_URL = "https://script.google.com/macros/s/AKfycbyRKJnxZk0h2Ve0avffRED6IYyuZ6Bq7Tfs_jzpVc_kXd_dtLIYqzI4XyR9MRJZ6e4OIA/exec";
+
+
+/* =====================================================
+   ข้อมูลสินค้า
+   ===================================================== */
+
+const price = 25;
+
+const flavors = [
+  "น้ำผึ้ง",
+  "ออริจินอล",
+  "สตรอว์เบอร์รี่",
+  "มะพร้าว"
+];
+
+const qty = [0,0,0,0];
+
+const stock = [50,50,50,50];
+
+let selectedTable = null;
+
+let selectedPay = "เงินสด";
+
+
+/* =====================================================
+   สร้างรายการสินค้า
+   ===================================================== */
+
+const products = document.getElementById("products");
+
+flavors.forEach((name,i)=>{
+
+  products.innerHTML += `
+
+    <div class="product">
+
+      <div class="product-name">
+        ${name}
+      </div>
+
+      <div class="product-desc">
+        โยเกิร์ต Malmilk
+      </div>
+
+      <div class="price">
+        ฿${price} / ถ้วย
+      </div>
+
+      <div
+        style="
+          margin-top:7px;
+          font-size:13px;
+          color:#8b6b52
+        "
+      >
+        คงเหลือ
+        <b id="stock${i}">
+          x
+        </b>
+        ถ้วย
+      </div>
+
+      <div class="qty">
+
+        <button
+          class="qty-btn"
+          onclick="changeQty(${i},-1)"
+          disabled
+        >
+          −
+        </button>
+
+        <span id="q${i}">
+          0
+        </span>
+
+        <button
+          class="qty-btn"
+          onclick="changeQty(${i},1)"
+          disabled
+        >
+          +
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+});
+
+
+/* =====================================================
+   ระบุโต๊ะ
+   ===================================================== */
+
+function setTable(value){
+
+  selectedTable = value.trim();
+
+  document.getElementById("sumTable").textContent =
+    selectedTable
+      ? "โต๊ะ " + selectedTable
+      : "ยังไม่ได้ระบุ";
+
+}
+
+
+/* =====================================================
+   เพิ่ม / ลดจำนวนสินค้า
+   ===================================================== */
+
+function changeQty(i,d){
+
+  if(d > 0 && qty[i] >= stock[i]){
+
+    alert(
+      "รส" +
+      flavors[i] +
+      " มีเหลือ " +
+      stock[i] +
+      " ถ้วยครับ"
+    );
+
+    return;
+  }
+
+
+  qty[i] = Math.max(
+    0,
+    qty[i] + d
+  );
+
+
+  document.getElementById("q"+i).textContent =
+    qty[i];
+
+
+  document.getElementById("stock"+i).textContent =
+    stock[i] - qty[i];
+
+
+  updateSummary();
+
+}
+
+
+/* =====================================================
+   เลือกวิธีชำระเงิน
+   ===================================================== */
+
+function selectPay(btn){
+
+  document
+    .querySelectorAll(".pay-btn")
+    .forEach(x =>
+      x.classList.remove("active")
+    );
+
+  btn.classList.add("active");
+
+  // บันทึกวิธีชำระเงินจริง
+  selectedPay = btn.dataset.pay;
+
+}
+
+
+/* =====================================================
+   อัปเดตสรุป
+   ===================================================== */
+
+function updateSummary(){
+
+  const totalItems =
+    qty.reduce((a,b)=>a+b,0);
+
+
+  document.getElementById("sumItems").textContent =
+    totalItems + " ชิ้น";
+
+
+  document.getElementById("total").textContent =
+    "฿" + (totalItems * price);
+
+}
+
+
+/* =====================================================
+   ดึงสต็อกจาก Google Sheets
+   ===================================================== */
+
+async function fetchStock(){
+
+  try{
+
+    const res =
+      await fetch(API_URL + "?action=getStock");
+
+    if(!res.ok){
+      throw new Error("HTTP Error " + res.status);
+    }
+
+    const data =
+      await res.json();
+
+
+    data.forEach((row,i)=>{
+  if(i >= flavors.length) return;
+  const q = Array.isArray(row) ? row[1] : row.qty;
+  stock[i] = Number(q) || 0;
+
+
+      const remain =
+        Math.max(
+          0,
+          stock[i] - qty[i]
+        );
+
+
+      document.getElementById(
+        "stock"+i
+      ).textContent = remain;
+
+    });
+
+
+    /* =================================================
+       ดึงสต็อกสำเร็จ
+       ปลดล็อกปุ่มยืนยัน และ + / -
+       ================================================= */
+
+    const orderBtn =
+      document.getElementById("orderBtn");
+
+    if(orderBtn){
+
+      orderBtn.disabled = false;
+
+      orderBtn.textContent =
+        "ยืนยันการสั่งซื้อ";
+
+      orderBtn.style.backgroundColor =
+        "#7b4b22";
+
+      orderBtn.style.cursor =
+        "pointer";
+
+    }
+
+
+    // ปลดล็อกปุ่ม + และ -
+    const qtyBtns =
+      document.querySelectorAll(".qty-btn");
+
+    qtyBtns.forEach(btn => {
+      btn.disabled = false;
+    });
+
+
+  }catch(err){
+
+    console.error(
+      "ดึงสต็อกไม่สำเร็จ",
+      err
+    );
+
+
+    /* =================================================
+       ดึงสต็อกไม่สำเร็จ
+       ล็อกทุกปุ่มสินค้าไว้
+       ================================================= */
+
+    const orderBtn =
+      document.getElementById("orderBtn");
+
+    if(orderBtn){
+
+      orderBtn.disabled = true;
+
+      orderBtn.textContent =
+        "ไม่สามารถนับสต็อคได้ กรุณาลองใหม่";
+
+      orderBtn.style.backgroundColor =
+        "#d32f2f";
+
+      orderBtn.style.cursor =
+        "not-allowed";
+
+    }
+
+
+    // ล็อกปุ่ม + และ -
+    const qtyBtns =
+      document.querySelectorAll(".qty-btn");
+
+    qtyBtns.forEach(btn => {
+      btn.disabled = true;
+    });
+
+  }
+
+}
+
+
+/*
+  ดึงสต็อกทันทีตอนเปิดเว็บ
+*/
+
+fetchStock();
+
+
+/*
+  อัปเดตสต็อกทุก 30 วินาที
+*/
+
+setInterval(
+  fetchStock,
+  30000
+);
+
+
+/* =====================================================
+   ส่งคำสั่งซื้อ
+   ===================================================== */
+
+function placeOrder(){
+
+  const totalItems =
+    qty.reduce((a,b)=>a+b,0);
+
+
+  /*
+    ตรวจสอบโต๊ะ
+  */
+
+  if(!selectedTable){
+
+    alert(
+      "กรุณาระบุหมายเลขโต๊ะก่อนครับ"
+    );
+
+    return;
+  }
+
+
+  /*
+    ตรวจสอบสินค้า
+  */
+
+  if(totalItems === 0){
+
+    alert(
+      "กรุณาเลือกโยเกิร์ตอย่างน้อย 1 ถ้วยครับ"
+    );
+
+    return;
+  }
+
+
+  let itemsDetail = [];
+
+  let itemsForDB = [];
+
+
+  flavors.forEach((f,i)=>{
+
+    if(qty[i] > 0){
+
+      itemsDetail.push(
+        `${f} x${qty[i]}`
+      );
+
+
+      itemsForDB.push({
+        name:f,
+        qty:qty[i]
+      });
+
+    }
+
+  });
+
+
+  /*
+    ส่งข้อมูลไป Google Apps Script
+  */
+
+  fetch(API_URL,{
+
+    method:"POST",
+
+    mode:"no-cors",
+
+    body:JSON.stringify({
+
+      table:selectedTable,
+
+      items:itemsForDB,
+
+      itemText:itemsDetail.join("\n"),
+
+      total:totalItems * price,
+
+      pay:selectedPay
+
+    })
+
+  })
+  .catch(err=>{
+
+    console.error(
+      "ส่งคำสั่งซื้อไม่สำเร็จ",
+      err
+    );
+
+  });
+
+
+  /*
+    แสดงหน้าสำเร็จ
+  */
+
+  document.getElementById(
+    "orderPage"
+  ).style.display = "none";
+
+
+  document.getElementById(
+    "success"
+  ).style.display = "block";
+
+
+  document.getElementById(
+    "successText"
+  ).innerHTML = `
+
+    โต๊ะ <b>${selectedTable}</b>
+    <br>
+
+    ${itemsDetail.join(" · ")}
+
+    <br>
+
+    จำนวน ${totalItems} ชิ้น ·
+    <b>฿${totalItems * price}</b>
+
+    <br>
+
+    ชำระเงิน: ${selectedPay}
+
+  `;
+
+}
+
+</script>
+
+</body>
+</html>
