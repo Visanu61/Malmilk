@@ -194,13 +194,12 @@ h2{
 
   <!-- โต๊ะ -->
   <div class="card">
-    <h2>1. ระบุหมายเลขโต๊ะ</h2>
+    <h2>1. ระบุชื่อ รุ่น เลขโต๊ะ</h2>
 
     <input
       id="tableInput"
       type="text"
-      inputmode="numeric"
-      placeholder="เช่น 5"
+      placeholder="พิมพ์ ชื่อ รุ่น เลขโต๊ะ เช่น สมชาย รุ่น 5 โต๊ะ 12"
       style="
         width:100%;
         padding:14px;
@@ -259,7 +258,7 @@ h2{
     <h2>สรุปคำสั่งซื้อ</h2>
 
     <div class="summary-row">
-      <span>โต๊ะ</span>
+      <span>ชื่อ / รุ่น / โต๊ะ</span>
       <strong id="sumTable">ยังไม่ได้ระบุ</strong>
     </div>
 
@@ -324,7 +323,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyRKJnxZk0h2Ve0avffRED6
    ข้อมูลสินค้า
    ===================================================== */
 
-const price = 25;
+const prices = [25,20,25,25]; // น้ำผึ้ง, ออริจินอล, สตรอว์เบอร์รี่, มะพร้าว
 
 const flavors = [
   "น้ำผึ้ง",
@@ -363,7 +362,7 @@ flavors.forEach((name,i)=>{
       </div>
 
       <div class="price">
-        ฿${price} / ถ้วย
+        ฿${prices[i]} / ถ้วย
       </div>
 
       <div
@@ -421,7 +420,7 @@ function setTable(value){
 
   document.getElementById("sumTable").textContent =
     selectedTable
-      ? "โต๊ะ " + selectedTable
+      ? selectedTable
       : "ยังไม่ได้ระบุ";
 
 }
@@ -490,6 +489,10 @@ function selectPay(btn){
    อัปเดตสรุป
    ===================================================== */
 
+function calcTotal(){
+  return qty.reduce((sum,q,i)=>sum + q*prices[i],0);
+}
+
 function updateSummary(){
 
   const totalItems =
@@ -501,7 +504,7 @@ function updateSummary(){
 
 
   document.getElementById("total").textContent =
-    "฿" + (totalItems * price);
+    "฿" + calcTotal();
 
 }
 
@@ -657,7 +660,7 @@ function placeOrder(){
   if(!selectedTable){
 
     alert(
-      "กรุณาระบุหมายเลขโต๊ะก่อนครับ"
+      "กรุณาพิมพ์ชื่อ รุ่น เลขโต๊ะ ก่อนครับ"
     );
 
     return;
@@ -720,7 +723,7 @@ function placeOrder(){
 
       itemText:itemsDetail.join("\n"),
 
-      total:totalItems * price,
+      total:calcTotal(),
 
       pay:selectedPay
 
@@ -755,7 +758,7 @@ function placeOrder(){
     "successText"
   ).innerHTML = `
 
-    โต๊ะ <b>${selectedTable}</b>
+    <b>${selectedTable}</b>
     <br>
 
     ${itemsDetail.join(" · ")}
@@ -763,7 +766,7 @@ function placeOrder(){
     <br>
 
     จำนวน ${totalItems} ชิ้น ·
-    <b>฿${totalItems * price}</b>
+    <b>฿${calcTotal()}</b>
 
     <br>
 
