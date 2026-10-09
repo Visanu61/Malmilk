@@ -17,13 +17,13 @@ h1{margin:0;font-size:1.6rem;font-weight:800}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--mute)}.dot.on{background:var(--ok)}.dot.err{background:var(--err)}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
 label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:4px}
-input{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
 .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}.row>div{flex:1 1 120px}.row>.url{flex:4 1 320px}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
 button{font:inherit;font-weight:600;padding:10px 16px;border-radius:6px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
 button.primary{background:var(--ink);color:var(--bg)}
 button:disabled{opacity:.5;cursor:wait}
-button:focus-visible,input:focus-visible{outline:3px solid var(--new);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--new);outline-offset:2px}
 .stockHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .stockHead h2{margin:0;font-size:1rem;font-weight:800}
 .stockHead span{color:var(--mute);font-size:.8rem}
@@ -51,6 +51,24 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--new);outline-of
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--new) 70%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
 @media (prefers-reduced-motion:reduce){.order.fresh{animation:none}}
 @media (max-width:560px){.order{grid-template-columns:auto 1fr}.done{grid-column:1/-1}}
+
+.posSum{font-weight:800;font-size:1.1rem;cursor:pointer}
+.pos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pItem{border:1px solid var(--line);border-left:6px solid var(--ok);border-radius:8px;padding:12px;background:var(--bg)}
+.pItem.out{border-left-color:var(--err);opacity:.6}
+.pName{font-weight:800;font-size:1.05rem;overflow-wrap:anywhere}
+.pPrice{color:var(--mute);font-size:.85rem}
+.pStock{font-size:.85rem;color:var(--mute);margin-top:4px}
+.pItem.out .pStock{color:var(--err);font-weight:600}
+.pStep{display:flex;align-items:center;gap:10px;margin-top:10px}
+.pStep button{width:44px;height:44px;padding:0;font-size:1.5rem;line-height:1;border-radius:50%}
+.pStep output{min-width:28px;text-align:center;font-size:1.4rem;font-weight:800}
+.payRow{display:flex;gap:8px;margin-top:12px}
+.payBtn{flex:1}
+.payBtn.on{background:var(--ink);color:var(--bg)}
+.posTotal{display:flex;justify-content:space-between;align-items:baseline;font-size:1.3rem;font-weight:800;border-top:1px solid var(--line);padding-top:10px;margin-top:12px}
+.ok{color:var(--ok)}
+@media (max-width:420px){.pos{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -82,7 +100,20 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--new);outline-of
     <div class="stock" id="stock"></div>
   </section>
 
-  <details class="panel"><summary>ข้อมูลที่ได้รับ (ไว้ตรวจปัญหา)</summary><pre id="raw" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 0;font-size:.8rem">ยังไม่มีข้อมูล</pre></details>
+  <details class="panel" id="posPanel" open>
+    <summary class="posSum">หน้าร้าน</summary>
+    <div class="pos" id="pos"><div class="empty">กำลังโหลดรายการ...</div></div>
+    <div class="payRow">
+      <button class="payBtn on" data-pay="เงินสด" aria-pressed="true">💵 เงินสด</button>
+      <button class="payBtn" data-pay="เงินโอน" aria-pressed="false">📱 เงินโอน</button>
+    </div>
+    <div class="posTotal"><span>ยอดรวม</span><span id="pTotal">฿0</span></div>
+    <div class="btns" style="margin-top:12px">
+      <button class="primary" id="pSend" disabled>บันทึกออเดอร์หน้าร้าน</button>
+      <button id="pClear">ล้างรายการ</button>
+    </div>
+    <div class="msg" id="pMsg" role="status"></div>
+  </details>
 
   <div class="counter"><b id="count">0</b><span>ออเดอร์รอส่ง · ใหม่ในรอบนี้ <strong id="newCount">0</strong></span></div>
   <div class="list" id="list"><div class="empty">กด “เริ่มรับออเดอร์” เพื่อเริ่มดึงข้อมูล</div></div>
@@ -141,6 +172,7 @@ async function loadStock(){
 }
 
 function renderStock(rows){
+  posSetMenu(rows);
   const box = $('stock'); box.innerHTML = '';
   rows.forEach(r => {
     const name = r.name ?? r.flavor ?? '-';
@@ -164,15 +196,16 @@ async function check(){
     const res = await fetch(api('action=getNewOrders'), {cache:'no-store'});
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const raw = await res.text();
-    $('raw').textContent = 'HTTP ' + res.status + ' · ' + raw.slice(0, 400);
     let rows;
-    try{ rows = JSON.parse(raw); }catch(e){ throw new Error('ไม่ใช่ข้อมูล JSON (ดูที่ “ข้อมูลที่ได้รับ” ด้านล่าง)'); }
+    try{ rows = JSON.parse(raw); }catch(e){ throw new Error('ไม่ใช่ข้อมูล JSON'); }
     if(!Array.isArray(rows)) throw new Error(rows && rows.error ? rows.error : 'ข้อมูลไม่ถูกรูปแบบ');
     const fresh = new Set();
     rows.forEach(o => { const k = keyOf(o); if(!seen.has(k)){ seen.add(k); if(!first) fresh.add(k); } });
     render(rows, fresh);
-    if(fresh.size){
-      newTotal += fresh.size; $('newCount').textContent = newTotal;
+    const mine = Math.min(fresh.size, selfAdded); selfAdded -= mine;
+    const theirs = fresh.size - mine;
+    if(theirs){
+      newTotal += theirs; $('newCount').textContent = newTotal;
       chime(); buzz();
       if(ctx && ctx.state !== 'running') $('msg').textContent = 'เบราว์เซอร์บล็อกเสียงอยู่ — กด “ทดสอบเสียง” หนึ่งครั้ง แล้วลองใหม่';
       document.title = '🔔 (' + newTotal + ') ออเดอร์ใหม่';
@@ -233,7 +266,7 @@ $('start').onclick = () => {
   const sec = Math.max(3, +$('sec').value || 5);
   try{ localStorage.setItem('sheetSec', sec); }catch(e){}
   audio(); keepAwake(); buzz();
-  stopTimer(); seen.clear(); first = true; newTotal = 0; $('newCount').textContent = 0;
+  stopTimer(); selfAdded = 0; seen.clear(); first = true; newTotal = 0; $('newCount').textContent = 0;
   document.title = baseTitle; setStatus('', 'กำลังเชื่อมต่อ...');
   check(); startTimer(sec);
   $('start').textContent = 'เริ่มใหม่'; $('stop').hidden = false;
@@ -246,6 +279,100 @@ $('vib').onclick = () => {
 };
 $('mute').onclick = () => { muted = !muted; $('mute').textContent = 'เสียง: ' + (muted ? 'ปิด' : 'เปิด'); };
 document.addEventListener('visibilitychange', () => { if(!document.hidden){ document.title = baseTitle; if(timer || worker) keepAwake(); } });
+
+/* ===== ออเดอร์หน้าร้าน ===== */
+const SHOP_NAME = 'หน้าร้าน';
+const PRICES = {'น้ำผึ้ง':25, 'ออริจินอล':20, 'สตรอว์เบอร์รี่':25, 'มะพร้าว':25};
+let menu = [], cart = {}, posPay = 'เงินสด', posBusy = false, selfAdded = 0, menuSig = '';
+const priceOf = name => PRICES[name] || 0;
+const running = () => !!(timer || worker);
+
+function posSetMenu(rows){
+  menu = rows.map(r => ({ name: String(r.name ?? r.flavor ?? '-'), qty: Number(r.qty ?? r.stock ?? 0) || 0 }));
+  const sig = JSON.stringify(menu);
+  if(sig === menuSig) return;
+  menuSig = sig;
+  posRender();
+}
+
+function posRender(){
+  const box = $('pos'); box.innerHTML = '';
+  menu.forEach(m => {
+    const out = m.qty <= 0;
+    if((cart[m.name] || 0) > m.qty){ if(m.qty > 0) cart[m.name] = m.qty; else delete cart[m.name]; }
+    const n = cart[m.name] || 0;
+    const el = document.createElement('div'); el.className = 'pItem' + (out ? ' out' : '');
+    const nm = document.createElement('div'); nm.className = 'pName'; nm.textContent = m.name;
+    const pr = document.createElement('div'); pr.className = 'pPrice'; pr.textContent = '฿' + priceOf(m.name) + ' / ถ้วย';
+    const sk = document.createElement('div'); sk.className = 'pStock';
+    sk.textContent = out ? 'หมด' : 'คงเหลือ ' + (m.qty - n) + ' ถ้วย';
+    el.append(nm, pr, sk);
+    if(!out){
+      const st = document.createElement('div'); st.className = 'pStep';
+      const minus = document.createElement('button'); minus.textContent = '−'; minus.setAttribute('aria-label', 'ลด ' + m.name);
+      const o = document.createElement('output'); o.textContent = n;
+      const plus = document.createElement('button'); plus.textContent = '+'; plus.setAttribute('aria-label', 'เพิ่ม ' + m.name);
+      minus.disabled = n <= 0; plus.disabled = n >= m.qty;
+      minus.onclick = () => posChange(m.name, -1, m.qty); plus.onclick = () => posChange(m.name, 1, m.qty);
+      st.append(minus, o, plus); el.append(st);
+    }
+    box.appendChild(el);
+  });
+  posSum();
+}
+
+function posChange(name, d, max){
+  const n = Math.max(0, Math.min(max, (cart[name] || 0) + d));
+  if(n) cart[name] = n; else delete cart[name];
+  posRender();
+}
+
+function posTotals(){
+  let qty = 0, price = 0;
+  Object.entries(cart).forEach(([k, n]) => { qty += n; price += n * priceOf(k); });
+  return { qty, price };
+}
+function posSum(){
+  const t = posTotals();
+  $('pTotal').textContent = '฿' + t.price;
+  $('pSend').disabled = posBusy || t.qty === 0;
+}
+
+document.querySelectorAll('.payBtn').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.payBtn').forEach(x => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+  b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); posPay = b.dataset.pay;
+});
+
+$('pClear').onclick = () => { cart = {}; $('pMsg').textContent = ''; posRender(); };
+
+$('pSend').onclick = async () => {
+  const pm = $('pMsg'); pm.className = 'msg';
+  const lines = Object.entries(cart).filter(([, n]) => n > 0);
+  if(!lines.length) return;
+  const payload = {
+    table: SHOP_NAME,
+    itemText: lines.map(([k, n]) => k + ' x' + n).join('\n'),
+    items: lines.map(([name, qty]) => ({ name, qty })),
+    total: posTotals().price,
+    pay: posPay
+  };
+  posBusy = true; $('pSend').textContent = 'กำลังบันทึก...'; $('pSend').disabled = true; pm.textContent = '';
+  const counted = running(); if(counted) selfAdded++;
+  try{
+    const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+    const r = JSON.parse(await res.text());
+    if(!r.success) throw new Error(r.error || 'บันทึกไม่สำเร็จ');
+    cart = {};
+    pm.className = 'msg ok'; pm.textContent = 'บันทึกแล้ว: ' + payload.itemText.replace(/\n/g, ' · ') + ' · ฿' + payload.total;
+    await check();
+  }catch(err){
+    if(counted) selfAdded = Math.max(0, selfAdded - 1);
+    pm.textContent = 'บันทึกไม่สำเร็จ: ' + err.message + ' — ลองกดอีกครั้ง';
+  }finally{
+    posBusy = false; $('pSend').textContent = 'บันทึกออเดอร์หน้าร้าน'; posRender();
+  }
+};
+
 loadStock();
 </script>
 </body>
