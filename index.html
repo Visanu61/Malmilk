@@ -69,6 +69,12 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .posTotal{display:flex;justify-content:space-between;align-items:baseline;font-size:1.3rem;font-weight:800;border-top:1px solid var(--line);padding-top:10px;margin-top:12px}
 .ok{color:var(--ok)}
 @media (max-width:420px){.pos{grid-template-columns:1fr}}
+
+.panel>summary{cursor:pointer;list-style:none}
+.panel>summary::-webkit-details-marker{display:none}
+.panel>summary::before{content:"▸ ";color:var(--mute)}
+.panel[open]>summary::before{content:"▾ "}
+.stockInfo{color:var(--mute);font-size:.8rem;font-weight:400;margin-left:8px}
 </style>
 </head>
 <body>
@@ -78,8 +84,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
     <div class="status"><span class="dot" id="dot"></span><span id="statusTxt">ยังไม่เริ่ม</span></div>
   </header>
 
-  <section class="panel">
-    <div class="row">
+  <details class="panel" open>
+    <summary class="posSum">ตั้งค่าการรับออเดอร์</summary>
+    <div class="row" style="margin-top:12px">
       <div>
         <label for="sec">เช็กทุกกี่วินาที</label>
         <input type="number" id="sec" min="3" value="5">
@@ -93,12 +100,12 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
       <button id="vib">สั่น: เปิด</button>
     </div>
     <div class="msg" id="msg" role="alert"></div>
-  </section>
+  </details>
 
-  <section class="panel" id="stockPanel">
-    <div class="stockHead"><h2>สต็อกคงเหลือ</h2><span id="stockInfo">ยังไม่โหลด</span></div>
-    <div class="stock" id="stock"></div>
-  </section>
+  <details class="panel" id="stockPanel" open>
+    <summary class="posSum">สต็อกคงเหลือ <span class="stockInfo" id="stockInfo">ยังไม่โหลด</span></summary>
+    <div class="stock" id="stock" style="margin-top:12px"></div>
+  </details>
 
   <details class="panel" id="posPanel" open>
     <summary class="posSum">หน้าร้าน</summary>
