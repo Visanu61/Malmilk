@@ -225,6 +225,10 @@ h2{
       แสดงจำนวนคงเหลือของแต่ละรสชาติ
     </div>
 
+    <div class="note" style="color:#2e7d32;font-weight:700">
+      🎁 โปร 4 แถม 1 · ซื้อครบ 4 ถ้วย แถมออริจินอลฟรี 1 ถ้วย (ระบบเติมให้อัตโนมัติ)
+    </div>
+
     <div class="products" id="products"></div>
 
   </div>
@@ -269,6 +273,11 @@ h2{
     <div class="summary-row">
       <span>รายการ</span>
       <strong id="sumItems">0 ชิ้น</strong>
+    </div>
+
+    <div class="summary-row" id="promoRow" style="display:none;color:#2e7d32">
+      <span id="promoTxt"></span>
+      <strong id="promoAmt"></strong>
     </div>
 
     <div class="summary-row total">
@@ -437,10 +446,6 @@ function changeQty(i,d){
     qty[i];
 
 
-  document.getElementById("stock"+i).textContent =
-    stock[i] - qty[i];
-
-
   updateSummary();
 
 }
@@ -470,8 +475,26 @@ function selectPay(btn){
    อัปเดตสรุป
    ===================================================== */
 
+const ORIG = 1; // ออริจินอล
+
+/* โปร 4 แถม 1: ทุก 4 ถ้วยที่ซื้อ แถมออริจินอลฟรี 1 ถ้วย
+   - ถ้ามีออริจินอลในตะกร้าอยู่แล้ว ใช้ถ้วยนั้นเป็นของแถม (หักราคา)
+   - ถ้าไม่มี/ไม่พอ ระบบเติมออริจินอลฟรีให้ (ต้องมีสต็อกพอ) */
+function promoCalc(){
+  const q = qty.reduce((a,b)=>a+b,0);
+  const o = qty[ORIG];
+  let free = 0, add = 0;
+  for(let k = Math.floor(q/4); k >= 1; k--){
+    const a = Math.max(0, k - o, 5*k - q);
+    if(a <= k && o + a <= stock[ORIG]){ free = k; add = a; break; }
+  }
+  const gross = qty.reduce((sum,n,i)=>sum + n*prices[i],0);
+  const discount = (free - add) * prices[ORIG];
+  return { q, free, add, discount, gross, price: gross - discount };
+}
+
 function calcTotal(){
-  return qty.reduce((sum,q,i)=>sum + q*prices[i],0);
+  return promoCalc().price;
 }
 
 function updateSummary(){
@@ -480,8 +503,26 @@ function updateSummary(){
     qty.reduce((a,b)=>a+b,0);
 
 
+  const p = promoCalc();
+
   document.getElementById("sumItems").textContent =
-    totalItems + " ชิ้น";
+    (totalItems + p.add) + " ชิ้น" + (p.add ? " (รวมแถม)" : "");
+
+  const promoRow = document.getElementById("promoRow");
+  promoRow.style.display = p.free ? "flex" : "none";
+  if(p.free){
+    document.getElementById("promoTxt").textContent =
+      "🎁 โปร 4 แถม 1 · ออริจินอล ฟรี " + p.free + " ถ้วย" +
+      (p.add ? " (เติมให้ " + p.add + ")" : "");
+    document.getElementById("promoAmt").textContent =
+      p.discount ? "−฿" + p.discount : "ฟรี";
+  }
+
+  // อัปเดตจำนวนคงเหลือ (ออริจินอลหักถ้วยที่แถมด้วย)
+  flavors.forEach((f,i)=>{
+    document.getElementById("stock"+i).textContent =
+      Math.max(0, stock[i] - qty[i] - (i === ORIG ? p.add : 0));
+  });
 
 
   document.getElementById("total").textContent =
@@ -528,6 +569,8 @@ async function fetchStock(){
 
     });
 
+
+    updateSummary();
 
     /* =================================================
        ดึงสต็อกสำเร็จ
@@ -662,6 +705,8 @@ function placeOrder(){
   }
 
 
+  const p = promoCalc();
+
   let itemsDetail = [];
 
   let itemsForDB = [];
@@ -669,18 +714,26 @@ function placeOrder(){
 
   flavors.forEach((f,i)=>{
 
-    if(qty[i] > 0){
+    // ออริจินอลที่ซื้อจริง = ในตะกร้า ลบอันที่ใช้เป็นของแถม
+    const paid = (i === ORIG) ? qty[i] - (p.free - p.add) : qty[i];
 
-      itemsDetail.push(
-        `${f} x${qty[i]}`
-      );
+    if(paid > 0){
+      itemsDetail.push(`${f} x${paid}`);
+    }
 
+    // ออริจินอลที่แถม เขียนวงเล็บ (แถม) ต่อท้าย
+    if(i === ORIG && p.free > 0){
+      itemsDetail.push(`${f} x${p.free} (แถม)`);
+    }
 
+    // ตัดสต็อกตามจำนวนถ้วยจริง (รวมถ้วยที่แถม)
+    const stockQty = qty[i] + (i === ORIG ? p.add : 0);
+
+    if(stockQty > 0){
       itemsForDB.push({
         name:f,
-        qty:qty[i]
+        qty:stockQty
       });
-
     }
 
   });
@@ -704,7 +757,11 @@ function placeOrder(){
 
       itemText:itemsDetail.join("\n"),
 
-      total:calcTotal(),
+      total:p.price,
+
+      promoFree:p.free,
+
+      discount:p.discount,
 
       pay:selectedPay
 
@@ -746,8 +803,8 @@ function placeOrder(){
 
     <br>
 
-    จำนวน ${totalItems} ชิ้น ·
-    <b>฿${calcTotal()}</b>
+    จำนวน ${totalItems + p.add} ชิ้น ·
+    <b>฿${p.price}</b>
 
     <br>
 
